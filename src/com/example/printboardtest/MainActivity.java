@@ -1,12 +1,19 @@
 package com.example.printboardtest;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.math.BigInteger;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -412,7 +419,7 @@ public class MainActivity extends Activity {
 			0x03 //End of attributes			
 		};
 		Thread threadGetPrinterAttri =new Thread(getPrinterAttributes); 
-		threadGetPrinterAttri.start();
+//		threadGetPrinterAttri.start();
 		try {
 			Thread.sleep(1000);
 		} catch (InterruptedException e1) {
@@ -420,7 +427,7 @@ public class MainActivity extends Activity {
 			e1.printStackTrace();
 		}
 		Thread threadValidateJob =new Thread(getJobAttributes); 
-		threadValidateJob.start();
+//		threadValidateJob.start();
 		try {
 			Thread.sleep(1000);
 		} catch (InterruptedException e1) {
@@ -505,7 +512,8 @@ public class MainActivity extends Activity {
 				HttpResponse httpResponse = httpClient.execute(httpPost);
 			} catch (IOException e) {
 					// TODO Auto-generated catch block
-					e.printStackTrace();
+				Log.d("Alex", "IOException"); 
+				e.printStackTrace();
 			}
 			try {
 				Thread.sleep(3000);
@@ -534,8 +542,9 @@ public class MainActivity extends Activity {
 
 				HttpResponse httpResponse = httpClient.execute(httpPost);
 			} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				// TODO Auto-generated catch block
+				Log.d("Alex", "IOException"); 
+				e.printStackTrace();
 			}
 			try {
 				Thread.sleep(3000);
@@ -573,19 +582,46 @@ public class MainActivity extends Activity {
 				httpPost.getParams().setParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, true); 
 				httpPost.addHeader("Content-Type", "application/ipp");
 //				//httpPost.addHeader("Transfer-Encoding", "chunked");
+								
 				ByteArrayInputStream bs=new ByteArrayInputStream(totalPrintJobByte);
 				InputStreamEntity et=new InputStreamEntity(bs, totalPrintJobByte.length);
 				//httpPost.setEntity(new ByteArrayEntity(totalPrintJobByte));
 				//et.setContentType("binary/octet-stream");
 				et.setChunked(true);
 				httpPost.setEntity(et);
-
 				HttpResponse httpResponse = httpClient.execute(httpPost);
 			} catch (IOException e) {
 				Log.d("Alex", "FAILED!"); 
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 			}
+			
+/*			
+			try{
+			URL myUrl = new URL("http://192.168.0.100:631/USB1_LQ"); 
+			HttpURLConnection connection = (HttpURLConnection) myUrl.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setRequestProperty("Content-Type", "application/ipp"); 
+			connection.addRequestProperty(CoreProtocolPNames.USER_AGENT, "Custom user agent");
+			connection.setDoOutput(true); 
+			connection.setDoInput(true); 
+			connection.connect(); 
+			Log.d("Alex", "about to write into output..."); 
+			DataOutputStream dos = new DataOutputStream(connection.getOutputStream()); 
+			connection.connect();
+			dos.write(totalPrintJobByte);;
+			dos.flush();
+			//OutputStream outputStream = connection.getOutputStream();
+			//outputStream.write(totalPrintJobByte, 0, totalPrintJobByte.length);
+			//outputStream.flush();
+			//outputStream.close();	
+			} catch (MalformedURLException e) {
+				Log.d("Alex", "MalformedURLException");
+			} catch (IOException e) {
+				Log.d("Alex", "IOException"); 
+				e.printStackTrace(); 
+			}
+*/			
 //			try {
 //				Thread.sleep(3000);
 //			} catch (InterruptedException e) {
