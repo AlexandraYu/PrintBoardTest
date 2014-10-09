@@ -446,7 +446,7 @@ public class MainActivity extends Activity {
 		File file = new File(fileDir); 
 		Log.d("Alex", "file is? "+file); 
 		try {
-			fileByte = convertFileToByte(file);
+			fileByte = convertFileToByte(file); //get the amount of bytes of that particular file
 			Log.d("Alex", "picByte length is: "+fileByte.length); 
 			Log.d("Alex", "picByte[0] is: "+fileByte[0]); 
 			Log.d("Alex", "picByte[1] is: "+fileByte[1]); 
@@ -640,10 +640,26 @@ public class MainActivity extends Activity {
 			connection.setDoOutput(true); 
 			
 			OutputStream outputStream = connection.getOutputStream();
+
 			outputStream.write(totalPrintJobByte);
 			outputStream.flush();
 			outputStream.close();
-			
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) 
+            {
+            	InputStream inputStream = connection.getInputStream();
+                String state = getStringFromInputStream(inputStream);
+                Log.d("Alex", "OK: ");
+            } 
+            else 
+            	Log.d("Alex", "failed" + responseCode);
+            
+			} catch (MalformedURLException e) {
+				Log.d("Alex", "MalformedURLException");
+			} catch (IOException e) {
+				Log.d("Alex", "IOException"); 
+				e.printStackTrace(); 
+			}
 			int printJobByteLen = printJobByte.length;
 			
 			Log.d("Alex", "printJobByteLen is: "+printJobByteLen); 
@@ -669,7 +685,8 @@ public class MainActivity extends Activity {
 			int round = fileByte.length / 8192; //see how many chunks it needs to be cut
 			Log.d("Alex", "round is: "+round); 
 			int remainderByte = fileByte.length % 8192; //the last bit of the data
-			byte[] chunkLenByteArray = Integer.toHexString(8192).getBytes();
+			Log.d("Alex", "remainderByte is: "+remainderByte); 
+			byte[] chunkLenByteArray = Integer.toHexString(8192).getBytes(); //length in hex for each chunk's size
 			for(byte bb: chunkLenByteArray) {
 				Log.d("Alex", "checkLenByteArray is: "+bb); 
 			}
@@ -677,9 +694,67 @@ public class MainActivity extends Activity {
 			for(byte bbb: remainderByteLenByteArray) {
 				Log.d("Alex", "remainderByteLenByteArray: "+bbb); 
 			}
-			int totalLength = (chunkLenByteArray.length + delimiterArray.length + 8192 + delimiterArray.length) * round + remainderByteLenByteArray.length +remainderByte + delimiterArray.length + 1 + (delimiterArray.length) *2; 
+			int totalLength = (chunkLenByteArray.length + delimiterArray.length + 8192 + delimiterArray.length) * round + 
+					remainderByteLenByteArray.length +remainderByte + delimiterArray.length + 1 + (delimiterArray.length) *2; 
 			Log.d("Alex", "totalLength: "+totalLength); 
-			byte[] bigByteArray = new byte[totalLength]; 
+			byte[] bigByteArray = new byte[totalLength]; //hold the whole data, including the chunk delimiters
+			Log.d("Alex", "bigByteArray created!");
+			int count = 0; 
+			int offset = 8192+chunkLenByteArray.length+4; //data body size, and the length, +4 b/c it has to give out 4 bytes for delimiters 
+			for(int idx=0; idx<round; idx++) {
+				//length of chunk first... 
+				System.arraycopy(chunkLenByteArray, 0, bigByteArray, idx*(offset), chunkLenByteArray.length); 
+				//2 delimiters
+				Log.d("Alex", "chunk delimiter index: "+(idx*offset+chunkLenByteArray.length)); 
+				Log.d("Alex", "chunk 2nd delimiter index: "+(idx*offset+1+chunkLenByteArray.length));
+				bigByteArray[idx*offset+chunkLenByteArray.length]=0x0d; 
+				bigByteArray[idx*offset+1+chunkLenByteArray.length]=0x0a; 
+				//chunk data body
+				Log.d("Alex", "starting chunk body, first index: "+(idx*offset+2+chunkLenByteArray.length)); //correct
+				System.arraycopy(fileByte, 8192*idx, bigByteArray, idx*offset+2+chunkLenByteArray.length, 8192);
+				//another 2 delimiters to mark the end of this chunk
+				
+				Log.d("Alex", "delimiter at the end, index: "+(idx*offset+2+8192+chunkLenByteArray.length)); //correct
+				bigByteArray[idx*offset+2+8192+chunkLenByteArray.length] = 0x0d;
+				bigByteArray[idx*offset+3+8192+chunkLenByteArray.length] = 0x0a;
+				count = idx; 
+				Log.d("Alex", "count is: "+count);
+			}
+			count++;
+			//now the remainder part... 
+			Log.d("Alex", "first index for remainder part: "+(count*offset)); //ok 98400
+			Log.d("Alex", "remainder length: "+remainderByteLenByteArray.length); //ok 3
+			//chunk length
+			System.arraycopy(remainderByteLenByteArray, 0, bigByteArray, count*offset, remainderByteLenByteArray.length); 
+			//2 delimiters...
+			bigByteArray[count*offset+remainderByteLenByteArray.length]=0x0d; //98403
+			bigByteArray[count*offset+1+remainderByteLenByteArray.length]=0x0a; //98404
+			//data body...
+			Log.d("Alex", "first index for remainder data body part: "+(count*offset+1+remainderByteLenByteArray.length+1)); //ok 98405
+
+			System.arraycopy(fileByte, 8192*count, bigByteArray, count*offset+1+remainderByteLenByteArray.length+1, remainderByte);
+			Log.d("Alex", "remainder's 2nd set of delimiter: "+(count*offset+1+remainderByteLenByteArray.length+1+remainderByte)); 
+			bigByteArray[count*offset+1+remainderByteLenByteArray.length+1+remainderByte] = 0x0d; 
+			bigByteArray[count*offset+1+remainderByteLenByteArray.length+1+remainderByte+1] = 0x0a; 
+			//now the "end point" of data begins... 
+			int endPoint = count*offset+1+remainderByteLenByteArray.length+1+remainderByte+1+1;
+			Log.d("Alex", "what is endPoint? "+endPoint); 
+			bigByteArray[endPoint]=0x30; 
+			bigByteArray[endPoint+1]=0x0d; 
+			bigByteArray[endPoint+2]=0x0a;
+//			bigByteArray[endPoint+3]=0x0d;
+//			bigByteArray[endPoint+4]=0x0a;
+			
+			for (int x=0; x<bigByteArray.length; x++) {
+				
+				Log.d("Alex", "oh yeh! bigByteArray is ["+x+"]: "+Integer.toHexString(bigByteArray[x])); 
+				
+			}
+
+			/*
+			outputStream.write(bigByteArray);
+			outputStream.flush();
+			outputStream.close();
             int responseCode = connection.getResponseCode();
             if (responseCode == 200) 
             {
@@ -697,7 +772,7 @@ public class MainActivity extends Activity {
 				e.printStackTrace(); 
 			}
 			
-			
+			*/
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
